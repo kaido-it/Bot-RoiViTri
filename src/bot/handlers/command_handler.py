@@ -17,7 +17,7 @@ from src.bot.handlers import keyboard
 
 
 # Conversation states
-(AWAITING_FULL_NAME,) = range(1)
+(AWAITING_FULL_NAME, AWAITING_LEAVE_REASON, AWAITING_LEAVE_TIME) = range(1, 4)
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -33,7 +33,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Kiểm tra user đã đăng ký chưa
     if user_service.UserService.is_registered(telegram_id):
         await update.message.reply_text(
-            text=f"Xin chào {full_name}! 👋\n\nBot đã sẵn sàng. Sử dụng menu bên dưới để chấm công:",
+            text=f"Xin chao {full_name}! 👋\n\nBot da san sang. Su dung menu ben duoi de cham cong:",
             reply_markup=keyboard.get_main_keyboard()
         )
     else:
@@ -45,9 +45,9 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         
         await update.message.reply_text(
-            text=f"🎉 Đăng ký thành công!\n\n"
-                 f"Chào mừng {full_name}!\n\n"
-                 f"Bạn có thể sử dụng các chức năng bên dưới:",
+            text=f"Dang ky thanh cong!\n\n"
+                 f"Chao muc {full_name}!\n\n"
+                 f"Ban co the su dung cac chuc nang ben duoi:",
             reply_markup=keyboard.get_main_keyboard()
         )
 
@@ -64,7 +64,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Xử lý command /menu - hiển thị menu chính"""
     await update.message.reply_text(
-        text="📋 *Menu chính*\n\nChọn chức năng:",
+        text="Menu chinh\n\nChon chuc nang:",
         parse_mode="Markdown",
         reply_markup=keyboard.get_main_keyboard()
     )
@@ -82,34 +82,71 @@ async def check_in_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if result["success"]:
         await update.message.reply_text(
-            text=f"✅ *{result['message']}*",
+            text=f"{result['message']}",
             parse_mode="Markdown"
         )
     else:
         await update.message.reply_text(
-            text=f"⚠️ *{result['message']}*",
+            text=f"{result['message']}",
             parse_mode="Markdown"
         )
 
 
 async def break_start_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Xử lý ra ca"""
+    """Xử lý ra ca - hỏi thời gian nghỉ"""
+    user = update.effective_user
+    telegram_id = user.id
+    
+    # Hiển keyboard chọn thời gian nghỉ
+    await update.message.reply_text(
+        text="Ban muon nghi bao lau?",
+        reply_markup=keyboard.get_confirm_leave_keyboard()
+    )
+
+
+async def break_start_with_time(update: Update, context: ContextTypes.DEFAULT_TYPE, minutes: int = None):
+    """Xử lý ra ca với thời gian cụ thể"""
     user = update.effective_user
     telegram_id = user.id
     
     result = attendance_service.AttendanceService.record_action(
         telegram_id=telegram_id,
-        action_type=config.ACTION_BREAK_START
+        action_type=config.ACTION_BREAK_START,
+        note=f"{minutes} phut" if minutes else "Khong gioi han"
+    )
+    
+    if result["success"]:
+        # Hiển thị keyboard với nút quay lại làm việc
+        time_msg = f"{minutes} phut" if minutes else "khong gioi han"
+        await update.message.reply_text(
+            text=f"{result['message']}\n\nThoi gian nghi: {time_msg}",
+            reply_markup=keyboard.get_break_keyboard()
+        )
+    else:
+        await update.message.reply_text(
+            text=f"{result['message']}",
+            parse_mode="Markdown"
+        )
+
+
+async def back_to_work_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Xử lý quay lại làm việc sau khi nghỉ"""
+    user = update.effective_user
+    telegram_id = user.id
+    
+    result = attendance_service.AttendanceService.record_action(
+        telegram_id=telegram_id,
+        action_type=config.ACTION_BREAK_END
     )
     
     if result["success"]:
         await update.message.reply_text(
-            text=f"☕ *{result['message']}*",
-            parse_mode="Markdown"
+            text=f"{result['message']}",
+            reply_markup=keyboard.get_main_keyboard()
         )
     else:
         await update.message.reply_text(
-            text=f"⚠️ *{result['message']}*",
+            text=f"{result['message']}",
             parse_mode="Markdown"
         )
 
@@ -126,34 +163,55 @@ async def break_end_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if result["success"]:
         await update.message.reply_text(
-            text=f"✅ *{result['message']}*",
+            text=f"{result['message']}",
             parse_mode="Markdown"
         )
     else:
         await update.message.reply_text(
-            text=f"⚠️ *{result['message']}*",
+            text=f"{result['message']}",
             parse_mode="Markdown"
         )
 
 
 async def check_out_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Xử lý rời vị trí"""
+    """Xử lý rời vị trí - hiển thị keyboard chọn lý do"""
+    user = update.effective_user
+    telegram_id = user.id
+    
+    # Kiểm tra đã check-in hôm nay chưa
+    if not attendance_service.AttendanceService.has_checked_in_today(telegram_id):
+        await update.message.reply_text(
+            text="Ban chua bao len ca hom nay!",
+            parse_mode="Markdown"
+        )
+        return
+    
+    # Hiển thị keyboard chọn lý do rời vị trí
+    await update.message.reply_text(
+        text="Ban muon roi vi tri de lam gi?",
+        reply_markup=keyboard.get_location_keyboard()
+    )
+
+
+async def check_out_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE, reason: str = None):
+    """Xử lý rời vị trí với lý do"""
     user = update.effective_user
     telegram_id = user.id
     
     result = attendance_service.AttendanceService.record_action(
         telegram_id=telegram_id,
-        action_type=config.ACTION_CHECK_OUT
+        action_type=config.ACTION_CHECK_OUT,
+        note=reason
     )
     
     if result["success"]:
         await update.message.reply_text(
-            text=f"👋 *{result['message']}*",
+            text=f"{result['message']}",
             parse_mode="Markdown"
         )
     else:
         await update.message.reply_text(
-            text=f"⚠️ *{result['message']}*",
+            text=f"{result['message']}",
             parse_mode="Markdown"
         )
 
@@ -194,6 +252,8 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         await break_start_action(update, context)
     elif text == "👋 Rời vị trí":
         await check_out_action(update, context)
+    elif text == "✅ Quay lại làm việc":
+        await back_to_work_action(update, context)
     elif text == "📋 Lịch sử":
         await history_action(update, context)
     elif text == "📊 Tuần này":
@@ -202,7 +262,7 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         await help_command(update, context)
     else:
         await update.message.reply_text(
-            text="❓ Tôi không hiểu. Vui lòng sử dụng menu bên dưới:",
+            text="Toi khong hieu. Vui long su dung menu ben duoi:",
             reply_markup=keyboard.get_main_keyboard()
         )
 

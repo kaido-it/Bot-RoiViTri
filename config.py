@@ -11,7 +11,7 @@ BASE_DIR = Path(__file__).resolve().parent
 DATABASE_PATH = BASE_DIR / "data" / "attendance.db"
 
 # Telegram Bot Token - LẤY TỪ @BotFather
-BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8113902916:AAHvqM6siiVHAkdmH26KNjuXxI9Rh1i0mjE")
 
 # Cấu hình Database
 DATABASE_CONFIG = {
@@ -52,8 +52,8 @@ ACTION_CHECK_OUT = "check_out"
 
 # Mapping action types để hiển thị
 ACTION_LABELS = {
-    ACTION_CHECK_IN: "🚀 Báo lên ca",
-    ACTION_BREAK_START: "☕ Ra ca",
-    ACTION_BREAK_END: "☕ Vào ca",
-    ACTION_CHECK_OUT: "👋 Rời vị trí"
+    ACTION_CHECK_IN: "Bao len ca",
+    ACTION_BREAK_START: "Ra ca",
+    ACTION_BREAK_END: "Quay lai lam viec",
+    ACTION_CHECK_OUT: "Roi vi tri"
 }

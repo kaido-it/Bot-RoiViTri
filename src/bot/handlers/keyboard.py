@@ -25,6 +25,22 @@ def get_main_keyboard() -> ReplyKeyboardMarkup:
     )
 
 
+def get_break_keyboard() -> ReplyKeyboardMarkup:
+    """
+    Keyboard khi đang trong giờ nghỉ - có nút quay lại làm việc
+    """
+    keyboard = [
+        [KeyboardButton(text="✅ Quay lại làm việc")],
+        [KeyboardButton(text="📋 Lịch sử"), KeyboardButton(text="❓ Trợ giúp")]
+    ]
+    
+    return ReplyKeyboardMarkup(
+        keyboard=keyboard,
+        resize_keyboard=True,
+        one_time_keyboard=False
+    )
+
+
 def get_main_inline_keyboard() -> InlineKeyboardMarkup:
     """
     Tạo inline keyboard chính
@@ -74,6 +90,49 @@ def get_registration_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 
+def get_location_keyboard() -> InlineKeyboardMarkup:
+    """
+    Keyboard để chọn lý do rời vị trí
+    """
+    keyboard = [
+        [
+            InlineKeyboardButton(text="🏠 Về nhà", callback_data="location_home"),
+            InlineKeyboardButton(text="🏢 Công việc", callback_data="location_work")
+        ],
+        [
+            InlineKeyboardButton(text="🚗 Di chuyển", callback_data="location_move"),
+            InlineKeyboardButton(text="📝 Khác", callback_data="location_other")
+        ],
+        [
+            InlineKeyboardButton(text="❌ Hủy", callback_data="location_cancel")
+        ]
+    ]
+    
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+
+def get_confirm_leave_keyboard() -> InlineKeyboardMarkup:
+    """
+    Keyboard xác nhận rời vị trí với thời gian
+    """
+    keyboard = [
+        [
+            InlineKeyboardButton(text="15 phút", callback_data="leave_15"),
+            InlineKeyboardButton(text="30 phút", callback_data="leave_30"),
+            InlineKeyboardButton(text="60 phút", callback_data="leave_60")
+        ],
+        [
+            InlineKeyboardButton(text="120 phút", callback_data="leave_120"),
+            InlineKeyboardButton(text="Không giới hạn", callback_data="leave_unlimited")
+        ],
+        [
+            InlineKeyboardButton(text="❌ Hủy", callback_data="leave_cancel")
+        ]
+    ]
+    
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+
 # Callback data constants
 class CallbackData:
     # Action callbacks
@@ -81,8 +140,24 @@ class CallbackData:
     BREAK_START = "action_break_start"
     BREAK_END = "action_break_end"
     CHECK_OUT = "action_check_out"
+    BACK_TO_WORK = "action_back_to_work"
     HISTORY = "action_history"
     WEEK = "action_week"
+    
+    # Location callbacks
+    LOCATION_HOME = "location_home"
+    LOCATION_WORK = "location_work"
+    LOCATION_MOVE = "location_move"
+    LOCATION_OTHER = "location_other"
+    LOCATION_CANCEL = "location_cancel"
+    
+    # Leave time callbacks
+    LEAVE_15 = "leave_15"
+    LEAVE_30 = "leave_30"
+    LEAVE_60 = "leave_60"
+    LEAVE_120 = "leave_120"
+    LEAVE_UNLIMITED = "leave_unlimited"
+    LEAVE_CANCEL = "leave_cancel"
     
     # Confirmation callbacks
     CONFIRM_YES = "confirm_yes"
@@ -95,6 +170,16 @@ class CallbackData:
     # Navigation callbacks
     BACK_TO_MENU = "back_to_menu"
     HELP = "help"
+
+
+# Leave time options (in minutes)
+LEAVE_TIME_OPTIONS = {
+    "15": 15,
+    "30": 30,
+    "60": 60,
+    "120": 120,
+    "unlimited": None
+}
 
 
 def create_callback_data(action: str, *args) -> str:

@@ -14,6 +14,65 @@ class AttendanceService:
     """Service xử lý chấm công"""
     
     @staticmethod
+    def has_checked_in_today(telegram_id: int) -> bool:
+        """Kiểm tra đã check-in hôm nay chưa"""
+        db = get_db()
+        
+        user = user_service.UserService.get_user(telegram_id)
+        if not user:
+            return False
+        
+        user_id = user["id"]
+        today = date.today()
+        
+        row = db.fetchone(
+            """
+            SELECT id FROM attendance_records 
+            WHERE user_id = ? AND action_type = ? AND DATE(timestamp) = ?
+            """,
+            (user_id, config.ACTION_CHECK_IN, today)
+        )
+        
+        return row is not None
+    
+    @staticmethod
+    def is_on_break(telegram_id: int) -> bool:
+        """Kiểm tra đang trong giờ nghỉ"""
+        db = get_db()
+        
+        user = user_service.UserService.get_user(telegram_id)
+        if not user:
+            return False
+        
+        user_id = user["id"]
+        today = date.today()
+        
+        # Kiểm tra có break_start nhưng chưa có break_end
+        break_start = db.fetchone(
+            """
+            SELECT id FROM attendance_records 
+            WHERE user_id = ? AND action_type = ? AND DATE(timestamp) = ?
+            """,
+            (user_id, config.ACTION_BREAK_START, today)
+        )
+        
+        if not break_start:
+            return False
+        
+        # Kiểm tra có break_end sau break_start gần nhất chưa
+        break_end = db.fetchone(
+            """
+            SELECT id FROM attendance_records 
+            WHERE user_id = ? AND action_type = ? AND DATE(timestamp) = ? 
+            AND timestamp > (SELECT MAX(timestamp) FROM attendance_records 
+                           WHERE user_id = ? AND action_type = ? AND DATE(timestamp) = ?)
+            """,
+            (user_id, config.ACTION_BREAK_END, today, user_id, config.ACTION_BREAK_START, today)
+        )
+        
+        return break_end is None
+    
+    @staticmethod
     def record_action(telegram_id: int, action_type: str, note: str = None) -> dict:
         """
         Ghi nhận một hành động chấm công
@@ -26,7 +85,7 @@ class AttendanceService:
         if not user:
             return {
                 "success": False,
-                "message": "Bạn chưa đăng ký! Vui lòng dùng /start để đăng ký."
+                "message": "Ban chua dang ky! Vui long dung /start de dang ky."
             }
         
         user_id = user["id"]
@@ -45,7 +104,7 @@ class AttendanceService:
             if existing:
                 return {
                     "success": False,
-                    "message": "Bạn đã báo lên ca hôm nay rồi!"
+                    "message": "Ban da bao len ca hom nay roi!"
                 }
         
         elif action_type == config.ACTION_CHECK_OUT:
@@ -61,7 +120,7 @@ class AttendanceService:
             if not check_in:
                 return {
                     "success": False,
-                    "message": "Bạn chưa báo lên ca hôm nay!"
+                    "message": "Ban chua bao len ca hom nay!"
                 }
             
             # Kiểm tra đã check-out chưa
@@ -75,7 +134,30 @@ class AttendanceService:
             if existing:
                 return {
                     "success": False,
-                    "message": "Bạn đã rời vị trí hôm nay rồi!"
+                    "message": "Ban da roi vi tri hom nay roi!"
+                }
+        
+        elif action_type == config.ACTION_BREAK_START:
+            # Kiểm tra đã check-in chưa
+            if not AttendanceService.has_checked_in_today(telegram_id):
+                return {
+                    "success": False,
+                    "message": "Ban chua bao len ca hom nay!"
+                }
+            
+            # Kiểm tra đang trong giờ nghỉ chưa
+            if AttendanceService.is_on_break(telegram_id):
+                return {
+                    "success": False,
+                    "message": "Ban dang trong gio nghi! Vui long quay lai lam viec."
+                }
+        
+        elif action_type == config.ACTION_BREAK_END:
+            # Kiểm tra đang trong giờ nghỉ không
+            if not AttendanceService.is_on_break(telegram_id):
+                return {
+                    "success": False,
+                    "message": "Ban khong trong gio nghi!"
                 }
         
         # Ghi nhận action
@@ -93,14 +175,14 @@ class AttendanceService:
         
         # Tạo thông báo
         time_str = now.strftime("%H:%M:%S")
-        message = AttendanceService._get_action_message(action_type, time_str)
+        message = AttendanceService._get_action_message(action_type, time_str, note)
         
         # Nếu là checkout, tính tổng thời gian làm việc
         if action_type == config.ACTION_CHECK_OUT:
             work_minutes = AttendanceService._get_today_work_minutes(user_id)
             hours = work_minutes // 60
             minutes = work_minutes % 60
-            message += f"\n📊 Tổng thời gian làm việc: {hours}h {minutes}p"
+            message += f"\nTong thoi gian lam viec: {hours}h {minutes}p"
         
         return {
             "success": True,
@@ -186,15 +268,17 @@ class AttendanceService:
         return 0
     
     @staticmethod
-    def _get_action_message(action_type: str, time_str: str) -> str:
+    def _get_action_message(action_type: str, time_str: str, note: str = None) -> str:
         """Tạo thông báo cho từng action"""
+        note_msg = f" - {note}" if note else ""
+        
         messages = {
-            config.ACTION_CHECK_IN: f"✅ Bạn đã báo lên ca lúc {time_str}\nThời gian làm việc bắt đầu được ghi nhận!",
-            config.ACTION_BREAK_START: f"☕ Bạn đã ra ca lúc {time_str}\nThời gian nghỉ được ghi nhận!",
-            config.ACTION_BREAK_END: f"✅ Bạn đã vào ca lúc {time_str}\nTiếp tục làm việc nhé!",
-            config.ACTION_CHECK_OUT: f"👋 Bạn đã rời vị trí lúc {time_str}\nHẹn gặp lại!"
+            config.ACTION_CHECK_IN: f"Ban da bao len ca luc {time_str}\nThoi gian lam viec bat dau duoc ghi nhan!",
+            config.ACTION_BREAK_START: f"Ban da ra ca luc {time_str}\nThoi gian nghi duoc ghi nhan!{note_msg}",
+            config.ACTION_BREAK_END: f"Ban da vao ca luc {time_str}\nTiep tuc lam viec nhe!",
+            config.ACTION_CHECK_OUT: f"Ban da roi vi tri luc {time_str}{note_msg}\nHen gap lai!"
         }
-        return messages.get(action_type, "Hành động được ghi nhận!")
+        return messages.get(action_type, "Hanh dong duoc ghi nhan!")
     
     @staticmethod
     def get_today_history(telegram_id: int) -> dict:
@@ -205,7 +289,7 @@ class AttendanceService:
         if not user:
             return {
                 "success": False,
-                "message": "Bạn chưa đăng ký!"
+                "message": "Ban chua dang ky!"
             }
         
         user_id = user["id"]
@@ -223,19 +307,22 @@ class AttendanceService:
         if not records:
             return {
                 "success": True,
-                "message": "📋 Lịch sử chấm công hôm nay:\n\nChưa có bản ghi nào!",
+                "message": "Lich su cham cong hom nay:\n\nChua co ban ghi nao!",
                 "records": []
             }
         
         # Tạo danh sách records
         record_list = []
-        history_text = "📋 *Lịch sử chấm công hôm nay:*\n\n"
+        history_text = "Lich su cham cong hom nay:\n\n"
         
         for record in records:
             timestamp = dt.fromisoformat(record["timestamp"])
             time_str = timestamp.strftime("%H:%M:%S")
             action = record["action_type"]
             label = config.ACTION_LABELS.get(action, action)
+            note = record["note"]
+            
+            note_str = f" ({note})" if note else ""
             
             record_list.append({
                 "action_type": action,
@@ -243,7 +330,7 @@ class AttendanceService:
                 "note": record["note"]
             })
             
-            history_text += f"• {time_str} - {label}\n"
+            history_text += f"- {time_str} - {label}{note_str}\n"
         
         return {
             "success": True,
@@ -260,7 +347,7 @@ class AttendanceService:
         if not user:
             return {
                 "success": False,
-                "message": "Bạn chưa đăng ký!"
+                "message": "Ban chua dang ky!"
             }
         
         user_id = user["id"]
@@ -282,11 +369,11 @@ class AttendanceService:
         if not summaries:
             return {
                 "success": True,
-                "message": "📊 Lịch sử chấm công tuần này:\n\nChưa có bản ghi nào!",
+                "message": "Lich su cham cong tuan nay:\n\nChua co ban ghi nao!",
                 "records": []
             }
         
-        history_text = "📊 *Lịch sử chấm công tuần này:*\n\n"
+        history_text = "Lich su cham cong tuan nay:\n\n"
         total_work = 0
         
         for row in summaries:
@@ -297,16 +384,16 @@ class AttendanceService:
             
             total_work += work_minutes
             
-            check_in_str = "Nghỉ" if not check_in else dt.fromisoformat(check_in).strftime("%H:%M")
-            check_out_str = "Nghỉ" if not check_out else dt.fromisoformat(check_out).strftime("%H:%M")
+            check_in_str = "Nghi" if not check_in else dt.fromisoformat(check_in).strftime("%H:%M")
+            check_out_str = "Nghi" if not check_out else dt.fromisoformat(check_out).strftime("%H:%M")
             hours = work_minutes // 60
             minutes = work_minutes % 60
             
-            history_text += f"📅 {date_str}: {check_in_str} - {check_out_str} ({hours}h{minutes}p)\n"
+            history_text += f"{date_str}: {check_in_str} - {check_out_str} ({hours}h {minutes}p)\n"
         
         total_hours = total_work // 60
         total_mins = total_work % 60
-        history_text += f"\n📈 Tổng thời gian: {total_hours}h {total_mins}p"
+        history_text += f"\nTong thoi gian: {total_hours}h {total_mins}p"
         
         return {
             "success": True,

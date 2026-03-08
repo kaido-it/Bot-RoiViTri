@@ -6,6 +6,10 @@ import os
 import sys
 from telegram.ext import Application
 
+# Set UTF-8 encoding
+os.environ['PYTHONIOENCODING'] = 'utf-8'
+sys.stdout.reconfigure(encoding='utf-8')
+
 # Thêm thư mục gốc vào sys.path để import được config
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -18,17 +22,17 @@ def main():
     
     # Kiểm tra BOT_TOKEN
     if config.BOT_TOKEN == "YOUR_BOT_TOKEN_HERE":
-        print("❌ LỖI: Bạn cần cập nhật BOT_TOKEN trong file config.py!")
-        print("\n📝 Hướng dẫn lấy BOT_TOKEN:")
-        print("1. Mở Telegram và tìm @BotFather")
-        print("2. Gửi /newbot để tạo bot mới")
-        print("3. Làm theo hướng dẫn để đặt tên bot")
-        print("4. BotFather sẽ cấp cho bạn một token")
-        print("5. Cập nhật BOT_TOKEN trong file config.py")
+        print("LOI: Ban can cap nhat BOT_TOKEN trong file config.py!")
+        print("\nHuong dan lay BOT_TOKEN:")
+        print("1. Mo Telegram va tim @BotFather")
+        print("2. Gui /newbot de tao bot moi")
+        print("3. Lam theo huong dan de dat ten bot")
+        print("4. BotFather se cap cho ban mot token")
+        print("5. Cap nhat BOT_TOKEN trong file config.py")
         return
     
-    print("🤖 Bot Telegram Chấm Công đang khởi động...")
-    print(f"📂 Database: {config.DATABASE_CONFIG['path']}")
+    print("Bot Telegram Cham Cong dang khoi dong...")
+    print(f"Database: {config.DATABASE_CONFIG['path']}")
     
     # Tạo Application
     application = Application.builder().token(config.BOT_TOKEN).build()
@@ -37,9 +41,9 @@ def main():
     command_handler.register_handlers(application)
     callback_handler.register_callback_handlers(application)
     
-    print("✅ Đăng ký handlers thành công!")
-    print("\n🚀 Bot đang chạy...")
-    print("Nhấn Ctrl+C để dừng bot\n")
+    print("Dang ky handlers thanh cong!")
+    print("\nBot dang chay...")
+    print("Nhan Ctrl+C de dung bot\n")
     
     # Chạy bot (polling)
     application.run_polling(drop_pending_updates=True)
